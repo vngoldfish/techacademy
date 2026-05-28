@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { VideoPlayerWithNotes } from "@/components/video/VideoPlayerWithNotes";
+import { LessonCompletionPanel } from "@/components/lesson/LessonCompletionPanel";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ courseId: string; lessonId: string }>;
@@ -25,6 +27,24 @@ export default async function LessonPage({ params }: PageProps) {
       orderIndex: true,
       isGated: true,
       session: { select: { courseId: true, title: true } },
+      assignment: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          isRequired: true,
+          submissions: {
+            where: { userId: session.user.id },
+            orderBy: { submittedAt: "desc" },
+            take: 1,
+            select: { id: true, content: true, status: true, feedback: true },
+          },
+        },
+      },
+      resources: {
+        orderBy: { orderIndex: "asc" },
+        select: { id: true, title: true, url: true, content: true },
+      },
     },
   });
 
@@ -77,6 +97,44 @@ export default async function LessonPage({ params }: PageProps) {
           videoType={lesson.videoType as "YOUTUBE" | "VIMEO" | "S3"}
           initialNotes={notes}
           initialPosition={progress?.lastPosition ?? 0}
+        />
+      </div>
+      <div className="grid gap-4 border-t bg-white p-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tài liệu bài học</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {lesson.description && <p className="whitespace-pre-wrap text-sm text-gray-600">{lesson.description}</p>}
+            {lesson.resources.length === 0 ? (
+              <p className="text-sm text-gray-500">Chưa có tài liệu bổ sung.</p>
+            ) : (
+              lesson.resources.map((resource) => (
+                <div key={resource.id} className="rounded-lg border p-3">
+                  <p className="font-medium text-gray-900">{resource.title}</p>
+                  {resource.url && (
+                    <a href={resource.url} className="text-sm text-blue-600 hover:underline" target="_blank">
+                      {resource.url}
+                    </a>
+                  )}
+                  {resource.content && <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">{resource.content}</p>}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <LessonCompletionPanel
+          lessonId={lesson.id}
+          videoCompleted={progress?.videoCompleted ?? false}
+          completed={progress?.completed ?? false}
+          assignment={lesson.assignment ? {
+            id: lesson.assignment.id,
+            title: lesson.assignment.title,
+            description: lesson.assignment.description,
+            isRequired: lesson.assignment.isRequired,
+          } : null}
+          submission={lesson.assignment?.submissions[0] ?? null}
         />
       </div>
     </div>

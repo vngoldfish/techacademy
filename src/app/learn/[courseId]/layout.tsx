@@ -56,36 +56,35 @@ export default async function LearnLayout({ children, params }: LayoutProps) {
 
   const progressRecords = await prisma.lessonProgress.findMany({
     where: { userId: session.user.id },
-    select: { lessonId: true, completed: true },
+    select: { lessonId: true, completed: true, videoCompleted: true },
   });
 
-  const completedLessonIds = new Set(
-    progressRecords.filter((p) => p.completed).map((p) => p.lessonId)
-  );
-
-  const firstLesson = course.sessions[0]?.lessons[0];
+  const progressByLesson = new Map(progressRecords.map((p) => [p.lessonId, p]));
+  let previousIncomplete = false;
 
   const sessions = course.sessions.map((s) => ({
     ...s,
-    lessons: s.lessons.map((l) => ({
-      ...l,
-      completed: completedLessonIds.has(l.id),
-      isCurrent: false,
-    })),
+    lessons: s.lessons.map((l) => {
+      const progress = progressByLesson.get(l.id);
+      const locked = l.isGated && previousIncomplete;
+      const completed = progress?.completed ?? false;
+      if (!completed) previousIncomplete = true;
+      return {
+        ...l,
+        completed,
+        inProgress: !!progress?.videoCompleted && !completed,
+        locked,
+        isCurrent: false,
+      };
+    }),
   }));
 
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
       <aside className="hidden w-72 shrink-0 border-r bg-white lg:block">
-        <LessonSidebar
-          sessions={sessions}
-          courseId={course.id}
-          currentLessonId={firstLesson?.id ?? ""}
-        />
+        <LessonSidebar sessions={sessions} courseId={course.id} currentLessonId="" />
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto bg-gray-50">
         {children}
       </main>

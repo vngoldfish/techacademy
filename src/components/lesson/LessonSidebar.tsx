@@ -11,6 +11,8 @@ interface LessonItem {
   isGated: boolean;
   isFree: boolean;
   completed: boolean;
+  inProgress?: boolean;
+  locked?: boolean;
   isCurrent: boolean;
 }
 
@@ -27,7 +29,7 @@ interface LessonSidebarProps {
   currentLessonId: string;
 }
 
-export function LessonSidebar({ sessions, courseId, currentLessonId }: LessonSidebarProps) {
+export function LessonSidebar({ sessions, courseId }: LessonSidebarProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
@@ -44,37 +46,34 @@ export function LessonSidebar({ sessions, courseId, currentLessonId }: LessonSid
               </h3>
             </div>
             <ul className="space-y-0.5">
-              {session.lessons.map((lesson) => {
-                const isLocked = lesson.isGated && !lesson.completed && !lesson.isCurrent;
-                return (
-                  <li key={lesson.id}>
-                    <Link
-                      href={isLocked ? "#" : `/learn/${courseId}/lesson/${lesson.id}`}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                        lesson.isCurrent
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : lesson.completed
-                            ? "text-gray-600 hover:bg-gray-50"
-                            : isLocked
-                              ? "cursor-not-allowed text-gray-400"
-                              : "text-gray-700 hover:bg-gray-50"
-                      )}
-                    >
-                      {lesson.completed ? (
-                        <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
-                      ) : isLocked ? (
-                        <Lock className="h-4 w-4 shrink-0" />
-                      ) : lesson.isCurrent ? (
-                        <PlayCircle className="h-4 w-4 shrink-0 text-blue-600" />
-                      ) : (
-                        <Circle className="h-4 w-4 shrink-0" />
-                      )}
-                      <span className="line-clamp-2">{lesson.title}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+              {session.lessons.map((lesson) => (
+                <li key={lesson.id}>
+                  <Link
+                    href={lesson.locked ? "#" : `/learn/${courseId}/lesson/${lesson.id}`}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                      lesson.completed
+                        ? "text-gray-600 hover:bg-gray-50"
+                        : lesson.locked
+                          ? "cursor-not-allowed text-gray-400"
+                          : lesson.inProgress
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    {lesson.completed ? (
+                      <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
+                    ) : lesson.locked ? (
+                      <Lock className="h-4 w-4 shrink-0" />
+                    ) : lesson.inProgress ? (
+                      <PlayCircle className="h-4 w-4 shrink-0 text-blue-600" />
+                    ) : (
+                      <Circle className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="line-clamp-2">{lesson.title}</span>
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         ))}

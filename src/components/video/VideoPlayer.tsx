@@ -14,6 +14,29 @@ interface VideoPlayerProps {
   startTime?: number;
 }
 
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeApiPromise: Promise<void> | null = null;
+
+function loadYouTubeApi() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.YT?.Player) return Promise.resolve();
+
+  youtubeApiPromise ??= new Promise<void>((resolve) => {
+    window.onYouTubeIframeAPIReady = () => resolve();
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(script);
+  });
+
+  return youtubeApiPromise;
+}
+
 function getYouTubeId(url: string) {
   try {
     const parsed = new URL(url);
@@ -59,7 +82,61 @@ export function VideoPlayer({
   startTime = 0,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLDivElement>(null);
+  const youtubeRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (videoType !== "YOUTUBE" || !youtubeRef.current) return;
+
+    let disposed = false;
+    const videoId = getYouTubeId(src);
+    if (!videoId) return;
+
+    loadYouTubeApi().then(() => {
+      if (disposed || !youtubeRef.current || !window.YT?.Player) return;
+
+      const player = new window.YT.Player(youtubeRef.current, {
+        videoId,
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          start: Math.floor(startTime),
+        },
+        events: {
+          onReady: () => {
+            playerRef.current = {
+              currentTime: (time?: number) => {
+                if (typeof time === "number") {
+                  player.seekTo(time, true);
+                  return time;
+                }
+                return player.getCurrentTime();
+              },
+              play: () => player.playVideo(),
+            };
+            onReady?.(playerRef.current);
+            intervalRef.current = setInterval(() => {
+              onTimeUpdate?.(Math.floor(player.getCurrentTime()));
+            }, 500);
+          },
+          onStateChange: (event: any) => {
+            if (event.data === window.YT.PlayerState.ENDED) {
+              onEnded?.();
+            }
+          },
+        },
+      });
+    });
+
+    return () => {
+      disposed = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      if (playerRef.current?.destroy) playerRef.current.destroy();
+      playerRef.current = null;
+    };
+  }, [src, videoType, startTime, onReady, onTimeUpdate, onEnded]);
 
   useEffect(() => {
     if (videoType !== "S3" || !videoRef.current) return;
@@ -112,13 +189,9 @@ export function VideoPlayer({
     if (!videoId) return <VideoError />;
 
     return (
-      <iframe
-        className="aspect-video w-full rounded-lg"
-        src={`https://www.youtube.com/embed/${videoId}`}
-        title="Video bài học"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowFullScreen
-      />
+      <div className="aspect-video min-h-[420px] w-full overflow-hidden rounded-lg bg-black [&_iframe]:h-full [&_iframe]:w-full">
+        <div ref={youtubeRef} className="h-full w-full" />
+      </div>
     );
   }
 

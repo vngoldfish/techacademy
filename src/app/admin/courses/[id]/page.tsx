@@ -75,6 +75,14 @@ export default function EditCoursePage() {
           {isPublished ? "Đã xuất bản" : "Nháp"}
         </Badge>
       </div>
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" variant="outline" onClick={() => router.push(`/admin/courses/${courseId}/sessions`)}>
+          Quản lý buổi học / bài giảng
+        </Button>
+        <Button type="button" variant="outline" onClick={() => router.push(`/admin/courses/${courseId}/quizzes/new`)}>
+          Tạo bài kiểm tra
+        </Button>
+      </div>
       <Card>
         <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">

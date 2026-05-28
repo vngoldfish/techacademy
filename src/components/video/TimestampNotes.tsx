@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Clock } from "lucide-react";
+import { Trash2, Clock } from "lucide-react";
 import { formatDuration } from "@/lib/utils";
 
 interface Note {
@@ -29,89 +29,91 @@ export function TimestampNotes({
   onJumpToTimestamp,
 }: TimestampNotesProps) {
   const [newNote, setNewNote] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
 
   function handleAdd() {
-    if (!newNote.trim()) return;
-    onAddNote(Math.floor(currentTime), newNote.trim());
+    const content = newNote.trim();
+    if (!content) return;
+
+    onAddNote(Math.floor(currentTime), content);
     setNewNote("");
-    setIsAdding(false);
   }
 
   const sortedNotes = [...notes].sort((a, b) => a.timestamp - b.timestamp);
+  const currentTimestamp = formatDuration(Math.floor(currentTime));
 
   return (
     <div className="flex h-full flex-col border-l bg-white">
       <div className="border-b p-4">
         <h3 className="font-semibold text-gray-900">Ghi chú</h3>
-        <p className="text-xs text-gray-500">{notes.length} ghi chú</p>
+        <p className="text-xs text-gray-500">
+          {notes.length} ghi chú · Đang ở {currentTimestamp}
+        </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {sortedNotes.length === 0 && !isAdding && (
-          <p className="text-center text-sm text-gray-400 py-8">
-            Chưa có ghi chú nào. Nhấn + để thêm.
+      <div className="border-b p-4">
+        <div className="space-y-2 rounded-lg border bg-blue-50 p-3">
+          <p className="text-xs font-medium text-blue-700">
+            Ghi chú tại {currentTimestamp}
+          </p>
+          <Input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder={`Viết ghi chú tại ${currentTimestamp}...`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+          />
+          <Button size="sm" className="w-full" onClick={handleAdd} disabled={!newNote.trim()}>
+            Lưu ghi chú
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {sortedNotes.length === 0 && (
+          <p className="py-8 text-center text-sm text-gray-400">
+            Chưa có ghi chú nào. Viết ghi chú ở ô bên trên, hệ thống sẽ lưu tại giây hiện tại của video.
           </p>
         )}
 
         {sortedNotes.map((note) => (
-          <div
+          <button
             key={note.id}
-            className="group rounded-lg border p-3 hover:bg-gray-50 transition-colors"
+            onClick={() => onJumpToTimestamp(note.timestamp)}
+            className="group w-full rounded-lg border p-3 text-left transition-colors hover:bg-gray-50"
           >
-            <div className="flex items-start justify-between">
-              <button
-                onClick={() => onJumpToTimestamp(note.timestamp)}
-                className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-              >
+            <div className="flex items-start justify-between gap-2">
+              <span className="flex items-center gap-2 text-sm font-medium text-blue-600">
                 <Clock className="h-3 w-3" />
                 {formatDuration(note.timestamp)}
-              </button>
-              <button
-                onClick={() => onDeleteNote(note.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+              </span>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteNote(note.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDeleteNote(note.id);
+                  }
+                }}
+                className="text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                aria-label="Xóa ghi chú"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </span>
             </div>
             <p className="mt-1 text-sm text-gray-700">{note.content}</p>
-          </div>
+          </button>
         ))}
-
-        {isAdding && (
-          <div className="rounded-lg border p-3 space-y-2">
-            <p className="text-xs text-gray-500">
-              Thêm ghi chú tại {formatDuration(Math.floor(currentTime))}
-            </p>
-            <Input
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Nội dung ghi chú..."
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleAdd}>Lưu</Button>
-              <Button size="sm" variant="outline" onClick={() => { setIsAdding(false); setNewNote(""); }}>
-                Hủy
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
-
-      {!isAdding && (
-        <div className="border-t p-4">
-          <Button
-            className="w-full"
-            variant="outline"
-            onClick={() => setIsAdding(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm ghi chú
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
