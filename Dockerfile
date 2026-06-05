@@ -1,6 +1,6 @@
 FROM node:22-slim
 
-ENV NODE_V8_FLAGS="--no-opt --no-turboshaft"
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 
 
