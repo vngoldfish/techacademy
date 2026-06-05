@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { CourseGrid } from "@/components/course/CourseGrid";
 import { ArrowRight, Award, Coins, Compass, Heart, MessageSquare, Newspaper, Video } from "lucide-react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { getPersonalizedRecommendations } from "@/lib/recommendations";
 
 export const metadata: Metadata = {
   title: "BawuiAcademy - Nền tảng học trực tuyến đa ngành chất lượng cao",
@@ -53,6 +55,17 @@ function getCardStyle(color: string) {
 
 export default async function HomePage() {
   const session = await auth();
+
+  // Query recommended courses
+  const cookieStore = await cookies();
+  const interestsCookieValue = cookieStore.get("user_interests")?.value;
+  const recommendedCourses = await getPersonalizedRecommendations(
+    session?.user?.id,
+    interestsCookieValue
+  );
+  
+  // Filter for courses with active interest points (views or enrollments)
+  const personalRecommendations = recommendedCourses.filter((c) => c.score > 0).slice(0, 3);
 
   // Query enrolled courses for user
   const enrollments = session?.user?.id
@@ -197,6 +210,26 @@ export default async function HomePage() {
             </Link>
           </div>
           <CourseGrid courses={continueCourses} />
+        </section>
+      )}
+
+      {/* Recommended Courses Section (Personalized) */}
+      {personalRecommendations.length > 0 && (
+        <section className="container mx-auto px-4 py-16 md:py-20 border-t border-slate-100 bg-gradient-to-b from-blue-50/10 via-indigo-50/5 to-transparent rounded-3xl my-8">
+          <div className="mb-10 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-750 border border-blue-100">
+                ✨ Dành riêng cho bạn
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-3">Khóa học gợi ý cho bạn</h2>
+              <p className="mt-1 text-sm sm:text-base text-slate-500">Được đề xuất dựa trên các khóa học bạn đã tham gia và các danh mục bạn quan tâm.</p>
+            </div>
+            <Link href="/courses" className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
+              <span>Tất cả khóa học</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <CourseGrid courses={personalRecommendations} />
         </section>
       )}
 

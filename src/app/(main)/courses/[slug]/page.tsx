@@ -11,6 +11,7 @@ import { PurchaseButton } from "@/components/course/PurchaseButton";
 import { BookOpen, Calendar, Award, PlayCircle, Coins, Clock, ArrowLeft, User } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { TrackCourseView } from "@/components/recommendation/TrackCourseView";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -67,6 +68,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
       description: true,
       thumbnailUrl: true,
       priceCredit: true,
+      category: true,
       creator: { select: { name: true, avatarUrl: true } },
       sessions: {
         orderBy: { orderIndex: "asc" },
@@ -157,6 +159,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <TrackCourseView category={course.category} slug={course.slug} />
       <div className="min-h-screen bg-slate-50/50 pb-20">
       {/* Course Dark Hero Block */}
       <section className="relative overflow-hidden bg-slate-900 py-16 text-white mb-12">

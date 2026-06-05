@@ -7,6 +7,7 @@ import Breadcrumbs from "@/components/common/Breadcrumbs";
 
 import { ArrowRight, Compass, GraduationCap, Heart, Home, Mail, Map, MessageSquare, Newspaper, User } from "lucide-react";
 import NotificationBell from "@/components/notification/NotificationBell";
+import { FloatingRecommendations } from "@/components/recommendation/FloatingRecommendations";
 
 export default async function MainLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -206,6 +207,7 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
           </div>
         </div>
       </footer>
+      <FloatingRecommendations />
     </div>
   );
 }
