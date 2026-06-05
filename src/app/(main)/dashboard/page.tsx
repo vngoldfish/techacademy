@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { BookOpen, CheckCircle, Clock, Wallet, Layout, Play, ChevronRight, Sparkles } from "lucide-react";
+import { BookOpen, CheckCircle, Clock, Wallet, Layout, Play, ChevronRight, Sparkles, Award } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin");
 
-  const [enrollments, recentProgress, wallet] = await Promise.all([
+  const [enrollments, recentProgress, wallet, dbUser] = await Promise.all([
     prisma.enrollment.findMany({
       where: { userId: session.user.id },
       orderBy: { enrolledAt: "desc" },
@@ -53,6 +53,10 @@ export default async function DashboardPage() {
       where: { userId: session.user.id },
       select: { balance: true },
     }),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { points: true },
+    }),
   ]);
 
   const inProgress = enrollments.filter((item) => item.progress < 100);
@@ -82,6 +86,14 @@ export default async function DashboardPage() {
       color: "text-emerald-600",
       bg: "bg-emerald-50/50 border-emerald-100/50",
       glow: "shadow-emerald-500/5"
+    },
+    { 
+      title: "Điểm thưởng", 
+      value: `${(dbUser?.points ?? 0).toLocaleString()} ⭐`, 
+      icon: Award, 
+      color: "text-amber-500",
+      bg: "bg-amber-50/50 border-amber-100/50",
+      glow: "shadow-amber-500/5"
     },
     { 
       title: "Số dư ví", 
@@ -117,7 +129,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-6 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           {stats.map((stat) => (
             <Card 
               key={stat.title} 

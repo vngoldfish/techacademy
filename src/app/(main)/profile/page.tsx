@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { WalletBalance } from "@/components/wallet/WalletBalance";
 import { TransactionHistory } from "@/components/wallet/TransactionHistory";
 import { TopUpForm } from "@/components/wallet/TopUpForm";
+import { RedeemPoints } from "@/components/wallet/RedeemPoints";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InstructorApplicationForm } from "./InstructorApplicationForm";
@@ -30,7 +31,7 @@ export default async function ProfilePage() {
     }),
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { role: true, instructorActive: true, instructorExpiresAt: true },
+      select: { role: true, instructorActive: true, instructorExpiresAt: true, points: true, pointsEarned: true },
     }),
     prisma.setting.findUnique({
       where: { key: "INSTRUCTOR_MONTHLY_FEE" },
@@ -44,10 +45,11 @@ export default async function ProfilePage() {
   const adminSharePercent = shareSetting ? parseInt(shareSetting.value, 10) : 30;
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <div className="container mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Ví credit</h1>
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <WalletBalance balance={wallet?.balance ?? 0} />
+        <RedeemPoints points={dbUser?.points ?? 0} pointsEarned={dbUser?.pointsEarned ?? 0} />
         <TopUpForm />
       </div>
       <Separator className="my-6" />

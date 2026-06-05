@@ -35,6 +35,7 @@ export async function completeLessonIfEligible(userId: string, lessonId: string)
     where: { id: lessonId },
     select: {
       id: true,
+      type: true,
       session: { select: { courseId: true } },
       assignment: { select: { id: true, isRequired: true } },
     },
@@ -70,6 +71,18 @@ export async function completeLessonIfEligible(userId: string, lessonId: string)
       completedAt: completed ? (progress.completedAt ?? new Date()) : null,
     },
   });
+
+  // Award reward points if lesson completed for the first time
+  if (completed && !progress.completed) {
+    const pointsAwarded = (lesson.assignment || lesson.type === "QUIZ") ? 20 : 10;
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        points: { increment: pointsAwarded },
+        pointsEarned: { increment: pointsAwarded },
+      },
+    });
+  }
 
   const courseProgress = await updateEnrollmentProgress(userId, lesson.session.courseId);
 

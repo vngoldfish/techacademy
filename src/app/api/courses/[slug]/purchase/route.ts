@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getInstructorRankAndCommission } from "@/lib/rewards";
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const session = await auth();
@@ -75,6 +76,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     select: { id: true, name: true, email: true },
   });
 
+  const creatorTier = await getInstructorRankAndCommission(course.creatorId);
+
   await prisma.$transaction(async (tx) => {
     // 1. Lock and verify student wallet
     const lockedWallet = await tx.creditWallet.findUnique({
@@ -132,8 +135,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
           },
         });
       } else {
-        // Share split between Instructor and Admin
-        const adminShare = Math.floor(course.priceCredit * (adminSharePercent / 100));
+        // Share split between Instructor and Admin based on Instructor Tier
+        const adminShare = Math.floor(course.priceCredit * (creatorTier.adminSharePercent / 100));
         const instructorShare = course.priceCredit - adminShare;
 
         // Credit to Instructor
@@ -156,7 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
             walletId: instructorWallet.id,
             amount: instructorShare,
             type: "TOPUP",
-            description: `Doanh thu bán khóa học: ${course.title} (${100 - adminSharePercent}%)`,
+            description: `Doanh thu bán khóa học: ${course.title} (${creatorTier.rankName} - ${creatorTier.commissionPercent}%)`,
             relatedCourseId: course.id,
           },
         });
@@ -182,7 +185,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
               walletId: adminWallet.id,
               amount: adminShare,
               type: "TOPUP",
-              description: `Phí chia sẻ doanh thu từ khóa học: ${course.title} (${adminSharePercent}%)`,
+              description: `Phí chia sẻ doanh thu từ khóa học: ${course.title} (${creatorTier.rankName} - ${creatorTier.adminSharePercent}%)`,
               relatedCourseId: course.id,
             },
           });
@@ -198,6 +201,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
         progress: 0,
       },
     });
+
+    // 6. Award Reward Points to Student (10% of course price, minimum 0)
+    const pointsToAward = Math.floor(course.priceCredit / 10);
+    if (pointsToAward > 0) {
+      await tx.user.update({
+        where: { id: session.user!.id },
+        data: {
+          points: { increment: pointsToAward },
+          pointsEarned: { increment: pointsToAward },
+        },
+      });
+    }
   });
 
   if (isHtmlRequest) {

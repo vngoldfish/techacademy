@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { BookOpen, Users, CreditCard, TrendingUp, AlertCircle, FileText, ArrowRight, ShieldAlert, Award, DollarSign, BarChart3, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { getInstructorRankAndCommission } from "@/lib/rewards";
 
 export default async function AdminDashboard() {
   const session = await auth();
@@ -24,7 +25,10 @@ export default async function AdminDashboard() {
   let myCoursesList: any[] = [];
   let totalCreditsNum = 0;
 
+  let tierInfo: any = null;
+
   if (isInstructor && userId) {
+    tierInfo = await getInstructorRankAndCommission(userId);
     // 1. Instructor Dashboard Stats
     const [
       myStudentsCount,
@@ -232,6 +236,38 @@ export default async function AdminDashboard() {
           </p>
         </div>
       </div>
+
+      {isInstructor && tierInfo && (
+        <Card className="border border-slate-100 shadow-sm bg-gradient-to-r from-blue-600 to-indigo-750 text-white rounded-2xl p-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 h-full w-1/3 opacity-10 flex items-center justify-center pointer-events-none">
+            <Award className="h-40 w-40" />
+          </div>
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div>
+              <span className={`inline-flex items-center rounded-lg border px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-white/10 border-white/20 text-white`}>
+                Cấp bậc đối tác: {tierInfo.rankName}
+              </span>
+              <h2 className="text-xl font-extrabold mt-3 tracking-tight">Chương trình Giảng viên Thành viên</h2>
+              <p className="text-xs text-blue-100 max-w-xl mt-1.5 leading-relaxed font-medium">
+                Bạn đang nhận tỷ lệ chia sẻ doanh thu là <strong className="text-white text-sm">{tierInfo.commissionPercent}%</strong> từ mỗi lượt bán khóa học (Admin nhận {tierInfo.adminSharePercent}% phí vận hành). Hãy tích cực tạo bài giảng mới để nâng hạng!
+              </p>
+            </div>
+            <div className="text-left md:text-right shrink-0 bg-white/10 border border-white/10 rounded-2xl p-4 min-w-[200px]">
+              <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider">Học viên của tôi</p>
+              <p className="text-2xl font-black mt-0.5">{tierInfo.totalStudents} học viên</p>
+              {tierInfo.nextRankThreshold ? (
+                <p className="text-[10px] text-blue-200 mt-1.5 font-bold">
+                  Cần thêm {tierInfo.nextRankThreshold - tierInfo.totalStudents} học viên để đạt mốc {tierInfo.commissionPercent + 5}%!
+                </p>
+              ) : (
+                <p className="text-[10px] text-emerald-300 mt-1.5 font-bold">
+                  Bậc cao nhất (Platinum - 85%) 🎉
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
