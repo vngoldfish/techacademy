@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UploadCloud, FileText, Download, Upload, Trash2, X, Plus, Edit } from "lucide-react";
+import { SubtitleEditor } from "@/components/admin/SubtitleEditor";
 
 interface QuestionItem {
   text: string;
@@ -115,6 +116,7 @@ export default function AdminLessonEditPage() {
   const [editResourceTitle, setEditResourceTitle] = useState("");
   const [editResourceUrl, setEditResourceUrl] = useState("");
   const [editResourceContent, setEditResourceContent] = useState("");
+  const [isSubtitleEditorOpen, setIsSubtitleEditorOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -749,9 +751,9 @@ export default function AdminLessonEditPage() {
                     </label>
 
                     {lesson.isInteractiveVideo && (
-                      <div className="space-y-2 p-4 bg-white border border-slate-100 rounded-2xl">
-                        <Label className="text-slate-600 text-xs font-semibold">Tải lên phụ đề (.srt, .vtt, .json)</Label>
-                        <div className="flex items-center gap-3">
+                      <div className="space-y-3 p-4 bg-white border border-slate-100 rounded-2xl">
+                        <Label className="text-slate-600 text-xs font-semibold">Cài đặt phụ đề tương tác</Label>
+                        <div className="flex flex-wrap items-center gap-3">
                           <input 
                             type="file" 
                             ref={subtitleInputRef}
@@ -764,9 +766,17 @@ export default function AdminLessonEditPage() {
                             variant="outline" 
                             onClick={() => subtitleInputRef.current?.click()}
                             disabled={uploadingSubtitle}
-                            className="rounded-xl border-slate-200"
+                            className="rounded-xl border-slate-200 text-xs h-9"
                           >
-                            {uploadingSubtitle ? "Đang tải lên..." : "Chọn tập tin..."}
+                            {uploadingSubtitle ? "Đang tải..." : "Tải file phụ đề..."}
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsSubtitleEditorOpen(true)}
+                            className="rounded-xl border-slate-200 text-xs h-9 bg-blue-50/50 hover:bg-blue-50 text-blue-600 border-blue-100 hover:border-blue-200"
+                          >
+                            Tự tạo & Biên tập Phụ đề...
                           </Button>
                           {lesson.subtitleUrl ? (
                             <div className="text-xs text-green-600 font-semibold truncate max-w-[200px] sm:max-w-md">
@@ -1177,6 +1187,38 @@ export default function AdminLessonEditPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {isSubtitleEditorOpen && lesson && (
+        <SubtitleEditor
+          videoUrl={lesson.videoUrl}
+          videoType={lesson.videoType as "YOUTUBE" | "VIMEO" | "S3"}
+          lessonDuration={lesson.duration}
+          initialSubtitleUrl={lesson.subtitleUrl ?? null}
+          onSave={async (url) => {
+            setLesson({ ...lesson, subtitleUrl: url });
+            setIsSubtitleEditorOpen(false);
+            try {
+              setSaving(true);
+              const res = await fetch(`/api/admin/lessons/${lessonId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...lesson,
+                  subtitleUrl: url
+                }),
+              });
+              if (!res.ok) throw new Error("Failed to save subtitle URL");
+              router.refresh();
+            } catch (err) {
+              console.error(err);
+              alert("Đã lưu tệp phụ đề nhưng không thể cập nhật vào cơ sở dữ liệu bài học.");
+            } finally {
+              setSaving(false);
+            }
+          }}
+          onClose={() => setIsSubtitleEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -87,3 +87,27 @@ export function parseSubtitles(content: string, filename: string): SubtitleCue[]
   }
   return cues;
 }
+
+function formatTimeToVTT(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.round((seconds % 1) * 1000);
+
+  const hrsStr = hrs.toString().padStart(2, "0");
+  const minsStr = mins.toString().padStart(2, "0");
+  const secsStr = secs.toString().padStart(2, "0");
+  const msStr = ms.toString().padStart(3, "0");
+
+  return `${hrsStr}:${minsStr}:${secsStr}.${msStr}`;
+}
+
+export function exportToVTT(cues: SubtitleCue[]): string {
+  let output = "WEBVTT\n\n";
+  cues.forEach((cue, index) => {
+    output += `${index + 1}\n`;
+    output += `${formatTimeToVTT(cue.start)} --> ${formatTimeToVTT(cue.end)}\n`;
+    output += `${cue.text}\n\n`;
+  });
+  return output.trim() + "\n";
+}
