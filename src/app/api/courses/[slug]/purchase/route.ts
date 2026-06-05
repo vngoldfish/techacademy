@@ -46,12 +46,67 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     return NextResponse.json({ error: "Bạn đã mua khóa học này" }, { status: 409 });
   }
 
+  // Parse coupon code from body or query
+  const urlObj = new URL(req.url);
+  let couponCode = urlObj.searchParams.get("coupon") || null;
+  if (!couponCode && req.headers.get("content-type")?.includes("application/json")) {
+    try {
+      const body = await req.json();
+      couponCode = body.couponCode || null;
+    } catch (e) {
+      // Ignore body parse errors
+    }
+  }
+
+  let coupon = null;
+  let discountAmount = 0;
+  let finalPrice = course.priceCredit;
+
+  if (couponCode) {
+    const uppercaseCode = couponCode.trim().toUpperCase();
+    coupon = await prisma.coupon.findUnique({
+      where: { code: uppercaseCode },
+    });
+
+    if (!coupon) {
+      return NextResponse.json({ error: "Mã giảm giá không tồn tại" }, { status: 400 });
+    }
+
+    if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+      return NextResponse.json({ error: "Mã giảm giá đã hết hạn sử dụng" }, { status: 400 });
+    }
+
+    if (coupon.usedCount >= coupon.maxUses) {
+      return NextResponse.json({ error: "Mã giảm giá đã hết lượt sử dụng" }, { status: 400 });
+    }
+
+    if (coupon.courseId && coupon.courseId !== course.id) {
+      return NextResponse.json({ error: "Mã giảm giá không áp dụng cho khóa học này" }, { status: 400 });
+    }
+
+    const existingUsage = await prisma.couponUsage.findUnique({
+      where: {
+        couponId_userId: {
+          couponId: coupon.id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (existingUsage) {
+      return NextResponse.json({ error: "Bạn đã sử dụng mã giảm giá này rồi" }, { status: 400 });
+    }
+
+    discountAmount = Math.floor(course.priceCredit * (coupon.discountPercent / 100));
+    finalPrice = Math.max(0, course.priceCredit - discountAmount);
+  }
+
   const wallet = await prisma.creditWallet.findUnique({
     where: { userId: session.user.id },
   });
 
-  if (!wallet || wallet.balance < course.priceCredit) {
-    const needed = course.priceCredit - (wallet?.balance ?? 0);
+  if (!wallet || wallet.balance < finalPrice) {
+    const needed = finalPrice - (wallet?.balance ?? 0);
     if (isHtmlRequest) {
       return NextResponse.redirect(
         new URL(`/profile?error=insufficient_credits&needed=${needed}`, req.url),
@@ -84,29 +139,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       where: { userId: session.user!.id },
     });
 
-    if (!lockedWallet || lockedWallet.balance < course.priceCredit) {
+    if (!lockedWallet || lockedWallet.balance < finalPrice) {
       throw new Error("Insufficient balance");
     }
 
     // 2. Deduct amount from student
     await tx.creditWallet.update({
       where: { id: lockedWallet.id },
-      data: { balance: { decrement: course.priceCredit } },
+      data: { balance: { decrement: finalPrice } },
     });
 
     // 3. Create purchase transaction for student
     await tx.transaction.create({
       data: {
         walletId: lockedWallet.id,
-        amount: -course.priceCredit,
+        amount: -finalPrice,
         type: "PURCHASE",
-        description: `Mua khóa học: ${course.title}`,
+        description: coupon
+          ? `Mua khóa học: ${course.title} (Áp dụng mã ${coupon.code} giảm ${coupon.discountPercent}%)`
+          : `Mua khóa học: ${course.title}`,
         relatedCourseId: course.id,
       },
     });
 
-    // 4. Distribute revenue if it's not a free course
-    if (course.priceCredit > 0) {
+    // 4. Distribute revenue if actual paid price is > 0
+    if (finalPrice > 0) {
       const isCreatorAdmin = course.creator.role === "ADMIN";
 
       if (isCreatorAdmin) {
@@ -122,22 +179,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
         await tx.creditWallet.update({
           where: { id: creatorAdminWallet.id },
-          data: { balance: { increment: course.priceCredit } },
+          data: { balance: { increment: finalPrice } },
         });
 
         await tx.transaction.create({
           data: {
             walletId: creatorAdminWallet.id,
-            amount: course.priceCredit,
+            amount: finalPrice,
             type: "TOPUP",
-            description: `Doanh thu bán khóa học: ${course.title} (100%)`,
+            description: `Doanh thu bán khóa học: ${course.title} (100% - Áp dụng giảm giá)`,
             relatedCourseId: course.id,
           },
         });
       } else {
         // Share split between Instructor and Admin based on Instructor Tier
-        const adminShare = Math.floor(course.priceCredit * (creatorTier.adminSharePercent / 100));
-        const instructorShare = course.priceCredit - adminShare;
+        const adminShare = Math.floor(finalPrice * (creatorTier.adminSharePercent / 100));
+        const instructorShare = finalPrice - adminShare;
 
         // Credit to Instructor
         let instructorWallet = await tx.creditWallet.findUnique({
@@ -159,7 +216,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
             walletId: instructorWallet.id,
             amount: instructorShare,
             type: "TOPUP",
-            description: `Doanh thu bán khóa học: ${course.title} (${creatorTier.rankName} - ${creatorTier.commissionPercent}%)`,
+            description: `Doanh thu bán khóa học: ${course.title} (${creatorTier.rankName} - ${creatorTier.commissionPercent}%, sau giảm giá)`,
             relatedCourseId: course.id,
           },
         });
@@ -185,7 +242,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
               walletId: adminWallet.id,
               amount: adminShare,
               type: "TOPUP",
-              description: `Phí chia sẻ doanh thu từ khóa học: ${course.title} (${creatorTier.rankName} - ${creatorTier.adminSharePercent}%)`,
+              description: `Phí chia sẻ doanh thu từ khóa học: ${course.title} (${creatorTier.rankName} - ${creatorTier.adminSharePercent}%, sau giảm giá)`,
               relatedCourseId: course.id,
             },
           });
@@ -193,7 +250,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       }
     }
 
-    // 5. Create enrollment
+    // 5. Log Coupon usage
+    if (coupon) {
+      await tx.couponUsage.create({
+        data: {
+          couponId: coupon.id,
+          userId: session.user!.id,
+        },
+      });
+
+      await tx.coupon.update({
+        where: { id: coupon.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
+    // 6. Create enrollment
     await tx.enrollment.create({
       data: {
         userId: session.user!.id,
@@ -202,8 +274,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       },
     });
 
-    // 6. Award Reward Points to Student (10% of course price, minimum 0)
-    const pointsToAward = Math.floor(course.priceCredit / 10);
+    // 7. Award Reward Points to Student (10% of actual price paid, minimum 0)
+    const pointsToAward = Math.floor(finalPrice / 10);
     if (pointsToAward > 0) {
       await tx.user.update({
         where: { id: session.user!.id },

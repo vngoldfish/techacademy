@@ -2,13 +2,14 @@ import type { Role } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, BookOpen, Users, FileCheck, Newspaper, UserCheck, ArrowLeft, ShieldAlert, Map, Settings } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, FileCheck, Newspaper, UserCheck, ArrowLeft, ShieldAlert, Map, Settings, Ticket } from "lucide-react";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 
 
 const adminNav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/courses", label: "Khóa học", icon: BookOpen },
+  { href: "/admin/coupons", label: "Mã giảm giá", icon: Ticket },
   { href: "/admin/users", label: "Người dùng", icon: Users },
   { href: "/admin/roadmaps", label: "Lộ trình học", icon: Map },
   { href: "/admin/submissions", label: "Bài nộp học viên", icon: FileCheck },
@@ -27,7 +28,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const isInstructor = user.role === "INSTRUCTOR";
   const filteredNav = isInstructor
-    ? adminNav.filter((item) => ["Dashboard", "Khóa học", "Bài nộp học viên"].includes(item.label))
+    ? adminNav.filter((item) => ["Dashboard", "Khóa học", "Mã giảm giá", "Bài nộp học viên"].includes(item.label))
     : adminNav.filter((item) => item.label !== "Bài nộp học viên");
 
   return (

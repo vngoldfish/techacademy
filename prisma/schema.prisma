@@ -535,3 +535,31 @@ model BlogComment {
   @@index([parentId])
   @@map("blog_comments")
 }
+
+model Coupon {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  discountPercent Int
+  maxUses         Int          @default(100)
+  usedCount       Int          @default(0)
+  expiresAt       DateTime?
+  courseId        String?
+  creatorId       String
+  createdAt       DateTime      @default(now())
+
+  usages          CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id       String   @id @default(cuid())
+  couponId String
+  userId   String
+  usedAt   DateTime @default(now())
+
+  coupon   Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId])
+  @@map("coupon_usages")
+}

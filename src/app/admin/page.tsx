@@ -4,6 +4,7 @@ import { BookOpen, Users, CreditCard, TrendingUp, AlertCircle, FileText, ArrowRi
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getInstructorRankAndCommission } from "@/lib/rewards";
+import { AreaChart, CourseBarChart, CategoryDistribution } from "@/components/admin/DashboardCharts";
 
 export default async function AdminDashboard() {
   const session = await auth();
@@ -27,16 +28,28 @@ export default async function AdminDashboard() {
 
   let tierInfo: any = null;
 
+  // Setup variables for charts
+  let monthlyEarningsChart: any[] = [];
+  let coursePerformanceData: any[] = [];
+  let categoryData: any[] = [];
+  let avgProgress = 0;
+  let quizPassRate = 0;
+  let grossGMV = 0;
+  let netPlatformProfit = 0;
+
   if (isInstructor && userId) {
     tierInfo = await getInstructorRankAndCommission(userId);
     // 1. Instructor Dashboard Stats
     const [
       myStudentsCount,
       myCoursesCount,
-      myEnrollmentsData,
       myRecentEnrollments,
       myPendingSubmissions,
-      instructorCoursesData
+      instructorCoursesData,
+      avgProgressAgg,
+      totalQuizAttempts,
+      passedQuizAttempts,
+      instructorWallet
     ] = await Promise.all([
       // Count unique students enrolled in instructor's courses
       prisma.enrollment.groupBy({
@@ -45,11 +58,6 @@ export default async function AdminDashboard() {
       }).then(res => res.length),
       
       prisma.course.count({ where: { creatorId: userId } }),
-      
-      prisma.enrollment.findMany({
-        where: { course: { creatorId: userId } },
-        select: { course: { select: { priceCredit: true } } }
-      }),
       
       prisma.enrollment.findMany({
         where: { course: { creatorId: userId } },
@@ -80,6 +88,23 @@ export default async function AdminDashboard() {
           _count: { select: { enrollments: true, sessions: true } }
         },
         orderBy: { createdAt: "desc" }
+      }),
+
+      prisma.enrollment.aggregate({
+        where: { course: { creatorId: userId } },
+        _avg: { progress: true }
+      }),
+
+      prisma.quizAttempt.count({
+        where: { quiz: { course: { creatorId: userId } } }
+      }),
+
+      prisma.quizAttempt.count({
+        where: { quiz: { course: { creatorId: userId } }, passed: true }
+      }),
+
+      prisma.creditWallet.findUnique({
+        where: { userId }
       })
     ]);
 
@@ -88,10 +113,65 @@ export default async function AdminDashboard() {
     recentEnrollments = myRecentEnrollments;
     pendingSubmissions = myPendingSubmissions;
     myCoursesList = instructorCoursesData;
-    
-    // Sum of credits from enrollments in instructor's courses
-    totalCreditsNum = myEnrollmentsData.reduce((acc, curr) => acc + (curr.course?.priceCredit ?? 0), 0);
+    avgProgress = Math.round(avgProgressAgg._avg.progress ?? 0);
+    quizPassRate = totalQuizAttempts > 0 ? Math.round((passedQuizAttempts / totalQuizAttempts) * 100) : 0;
+
+    // Fetch Net Instructor Earnings (TOPUPs into instructor wallet related to courses)
+    const instructorEarnings = instructorWallet
+      ? await prisma.transaction.findMany({
+          where: {
+            walletId: instructorWallet.id,
+            type: "TOPUP",
+            relatedCourseId: { not: null }
+          },
+          select: {
+            amount: true,
+            createdAt: true,
+            relatedCourseId: true
+          }
+        })
+      : [];
+
+    totalCreditsNum = instructorEarnings.reduce((acc, curr) => acc + curr.amount, 0);
     totalCreditsDisplay = totalCreditsNum.toLocaleString() + " Cr";
+
+    // Build 6-month earnings chart
+    const monthlyDataMap = new Map<string, number>();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyDataMap.set(key, 0);
+    }
+
+    instructorEarnings.forEach((tx) => {
+      const txDate = new Date(tx.createdAt);
+      const key = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyDataMap.has(key)) {
+        monthlyDataMap.set(key, monthlyDataMap.get(key)! + tx.amount);
+      }
+    });
+
+    monthlyEarningsChart = Array.from(monthlyDataMap.entries()).map(([month, revenue]) => {
+      const [year, monthNum] = month.split("-");
+      return {
+        label: `T${monthNum}/${year.slice(2)}`,
+        value: revenue
+      };
+    });
+
+    // Compute course performance data (for BarChart)
+    coursePerformanceData = instructorCoursesData.map((course) => {
+      const revenue = instructorEarnings
+        .filter((tx) => tx.relatedCourseId === course.id)
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+      return {
+        title: course.title,
+        enrollments: course._count.enrollments,
+        revenue,
+      };
+    }).sort((a, b) => b.revenue - a.revenue);
   } else {
     // 2. Global Admin Dashboard Stats
     const [
@@ -104,7 +184,9 @@ export default async function AdminDashboard() {
       adminPendingInstructors,
       adminPendingSubmissions,
       adminRecentTopups,
-      adminPopularCourses
+      adminPopularCourses,
+      grossGMVAgg,
+      adminUser
     ] = await Promise.all([
       prisma.user.count({ where: { role: "STUDENT" } }),
       prisma.user.count({ where: { role: "INSTRUCTOR" } }),
@@ -144,6 +226,14 @@ export default async function AdminDashboard() {
         },
         orderBy: { enrollments: { _count: "desc" } },
         take: 5
+      }),
+      prisma.transaction.aggregate({
+        where: { type: "PURCHASE" },
+        _sum: { amount: true }
+      }),
+      prisma.user.findFirst({
+        where: { role: "ADMIN" },
+        select: { id: true }
       })
     ]);
 
@@ -158,38 +248,163 @@ export default async function AdminDashboard() {
     popularCourses = adminPopularCourses;
     totalCreditsNum = adminTransactions._sum.amount ?? 0;
     totalCreditsDisplay = totalCreditsNum.toLocaleString() + " Cr";
+
+    // Gross GMV (absolute sum of purchases)
+    grossGMV = Math.abs(grossGMVAgg._sum.amount ?? 0);
+
+    // Fetch Net Admin Profit (TOPUPs into admin's wallet related to courses)
+    const adminWalletObj = adminUser
+      ? await prisma.creditWallet.findUnique({
+          where: { userId: adminUser.id }
+        })
+      : null;
+
+    const adminEarnings = adminWalletObj
+      ? await prisma.transaction.findMany({
+          where: {
+            walletId: adminWalletObj.id,
+            type: "TOPUP",
+            relatedCourseId: { not: null }
+          },
+          select: {
+            amount: true,
+            createdAt: true,
+            relatedCourseId: true
+          }
+        })
+      : [];
+
+    netPlatformProfit = adminEarnings.reduce((sum, tx) => sum + tx.amount, 0);
+
+    // Build 6-month platform revenue chart
+    const monthlyDataMap = new Map<string, number>();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyDataMap.set(key, 0);
+    }
+
+    adminEarnings.forEach((tx) => {
+      const txDate = new Date(tx.createdAt);
+      const key = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyDataMap.has(key)) {
+        monthlyDataMap.set(key, monthlyDataMap.get(key)! + tx.amount);
+      }
+    });
+
+    monthlyEarningsChart = Array.from(monthlyDataMap.entries()).map(([month, revenue]) => {
+      const [year, monthNum] = month.split("-");
+      return {
+        label: `T${monthNum}/${year.slice(2)}`,
+        value: revenue
+      };
+    });
+
+    // Compute popular courses sales performance (for BarChart)
+    const courseSales = await prisma.transaction.findMany({
+      where: {
+        type: "PURCHASE",
+        relatedCourseId: { in: adminPopularCourses.map((c) => c.id) }
+      },
+      select: {
+        amount: true,
+        relatedCourseId: true
+      }
+    });
+
+    coursePerformanceData = adminPopularCourses.map((course) => {
+      const salesVolume = courseSales
+        .filter((tx) => tx.relatedCourseId === course.id)
+        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+      return {
+        title: course.title,
+        enrollments: course._count.enrollments,
+        revenue: salesVolume,
+      };
+    });
+
+    // Compute category distribution
+    const coursesWithCategory = await prisma.course.findMany({
+      select: { id: true, category: true }
+    });
+    const courseCategoryMap = new Map(coursesWithCategory.map((c) => [c.id, c.category || "Chưa phân loại"]));
+
+    const categoryRevenueMap = new Map<string, number>();
+    adminEarnings.forEach((tx) => {
+      if (tx.relatedCourseId) {
+        const cat = courseCategoryMap.get(tx.relatedCourseId) || "Khác";
+        categoryRevenueMap.set(cat, (categoryRevenueMap.get(cat) ?? 0) + tx.amount);
+      }
+    });
+
+    categoryData = Array.from(categoryRevenueMap.entries())
+      .map(([category, revenue]) => ({ category, revenue }))
+      .sort((a, b) => b.revenue - a.revenue);
   }
 
-  const stats = [
-    { 
-      title: isInstructor ? "Học viên của tôi" : "Người học đăng ký", 
-      value: totalStudents, 
-      desc: isInstructor ? "Học viên đã mua khóa học của bạn" : "Tổng học viên trên hệ thống",
-      icon: Users, 
-      color: "text-blue-600 bg-blue-50 border-blue-100" 
-    },
-    { 
-      title: isInstructor ? "Việc cần xử lý" : "Giảng viên đối tác", 
-      value: isInstructor ? pendingSubmissions : totalInstructors, 
-      desc: isInstructor ? "Bài nộp bài tập chưa chấm" : "Tổng số giảng viên trên hệ thống",
-      icon: Award, 
-      color: "text-indigo-600 bg-indigo-50 border-indigo-100" 
-    },
-    { 
-      title: isInstructor ? "Khóa học của tôi" : "Khóa học trực tuyến", 
-      value: totalCourses, 
-      desc: isInstructor ? "Khóa học do bạn biên soạn" : "Tổng số khóa học hiện có",
-      icon: BookOpen, 
-      color: "text-emerald-600 bg-emerald-50 border-emerald-100" 
-    },
-    { 
-      title: isInstructor ? "Tổng doanh thu" : "Tổng credit nạp", 
-      value: totalCreditsDisplay, 
-      desc: isInstructor ? "Tổng credit tích lũy từ lượt bán" : "Tổng giá trị credit đã nạp hệ thống",
-      icon: CreditCard, 
-      color: "text-purple-600 bg-purple-50 border-purple-100" 
-    },
-  ];
+  const stats = isInstructor
+    ? [
+        { 
+          title: "Học viên của tôi", 
+          value: totalStudents, 
+          desc: "Học viên đã mua khóa học của bạn",
+          icon: Users, 
+          color: "text-blue-600 bg-blue-50 border-blue-100" 
+        },
+        { 
+          title: "Tiến trình trung bình", 
+          value: `${avgProgress}%`, 
+          desc: "Mức độ hoàn thành bài của học viên",
+          icon: GraduationCap, 
+          color: "text-emerald-600 bg-emerald-50 border-emerald-100" 
+        },
+        { 
+          title: "Tỷ lệ đỗ trắc nghiệm", 
+          value: `${quizPassRate}%`, 
+          desc: "Học viên làm bài thi đạt điểm qua",
+          icon: Award, 
+          color: "text-indigo-600 bg-indigo-50 border-indigo-100" 
+        },
+        { 
+          title: "Doanh thu thuần", 
+          value: totalCreditsDisplay, 
+          desc: "Tổng doanh thu tích lũy sau chia sẻ",
+          icon: CreditCard, 
+          color: "text-purple-600 bg-purple-50 border-purple-100" 
+        },
+      ]
+    : [
+        { 
+          title: "Người học đăng ký", 
+          value: totalStudents, 
+          desc: "Tổng học viên trên hệ thống",
+          icon: Users, 
+          color: "text-blue-600 bg-blue-50 border-blue-100" 
+        },
+        { 
+          title: "Tổng credit nạp", 
+          value: totalCreditsDisplay, 
+          desc: "Tổng giá trị credit đã nạp qua Stripe",
+          icon: CreditCard, 
+          color: "text-purple-600 bg-purple-50 border-purple-100" 
+        },
+        { 
+          title: "Tổng GMV mua khóa", 
+          value: `${grossGMV.toLocaleString()} Cr`, 
+          desc: "Tổng credit dùng mua khóa học",
+          icon: GraduationCap, 
+          color: "text-emerald-600 bg-emerald-50 border-emerald-100" 
+        },
+        { 
+          title: "Lợi nhuận ròng sàn", 
+          value: `${netPlatformProfit.toLocaleString()} Cr`, 
+          desc: "Lợi nhuận sàn sau chia sẻ + tự bán",
+          icon: Award, 
+          color: "text-indigo-600 bg-indigo-50 border-indigo-100" 
+        },
+      ];
 
   const pendingTasks = isInstructor
     ? [
@@ -285,6 +500,31 @@ export default async function AdminDashboard() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <AreaChart 
+            data={monthlyEarningsChart} 
+            title={isInstructor ? "Xu hướng Doanh thu thuần 6 tháng (Credit)" : "Xu hướng Lợi nhuận ròng của sàn 6 tháng (Credit)"} 
+            colorClassName={isInstructor ? "text-emerald-600" : "text-blue-600"}
+            gradientId="revenueGrad"
+          />
+        </div>
+        <div className="lg:col-span-1">
+          {isInstructor ? (
+            <CourseBarChart 
+              data={coursePerformanceData} 
+              title="So sánh hiệu suất khóa học" 
+            />
+          ) : (
+            <CategoryDistribution 
+              data={categoryData} 
+              title="Cơ cấu lợi nhuận theo Chuyên mục" 
+            />
+          )}
+        </div>
       </div>
 
       {/* Dashboard split content */}

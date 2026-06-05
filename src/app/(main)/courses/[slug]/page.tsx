@@ -314,13 +314,15 @@ export default async function CourseDetailPage({ params }: PageProps) {
             <div className="rounded-3xl border border-slate-200/60 bg-white p-6 sm:p-8 shadow-md space-y-6">
               
               {/* Pricing Display */}
-              <div className="text-center bg-slate-50/50 rounded-2xl py-6 border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Học phí khóa học</p>
-                <div className="inline-flex items-center gap-1.5 text-3xl font-black text-blue-600">
-                  <Coins className="h-7 w-7 text-blue-500 fill-blue-500/10 shrink-0" />
-                  <span>{formatCurrency(course.priceCredit)}</span>
+              {(!session?.user || isEnrolled) && (
+                <div className="text-center bg-slate-50/50 rounded-2xl py-6 border border-slate-100">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Học phí khóa học</p>
+                  <div className="inline-flex items-center gap-1.5 text-3xl font-black text-blue-600">
+                    <Coins className="h-7 w-7 text-blue-500 fill-blue-500/10 shrink-0" />
+                    <span>{formatCurrency(course.priceCredit)}</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Purchase / Enrolled status and buttons */}
               {isEnrolled ? (
@@ -340,7 +342,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
                   </a>
                 </div>
               ) : session?.user ? (
-                <PurchaseButton courseSlug={course.slug} />
+                <PurchaseButton 
+                  courseSlug={course.slug} 
+                  courseId={course.id} 
+                  originalPrice={course.priceCredit} 
+                />
               ) : (
                 <a href="/signin" className="block">
                   <Button className="w-full py-6 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10">
