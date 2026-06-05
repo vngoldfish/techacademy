@@ -126,10 +126,12 @@ model Lesson {
   type        LessonType @default(VIDEO)
   duration    Int?
   orderIndex  Int
-  isFree      Boolean    @default(false)
-  isGated     Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  isFree             Boolean          @default(false)
+  isGated            Boolean          @default(false)
+  isInteractiveVideo Boolean          @default(false)
+  subtitleUrl        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   videoNotes  VideoNote[]

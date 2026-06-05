@@ -22,6 +22,8 @@ const lessonSchema = z.object({
   orderIndex: z.number().min(1, "Thứ tự bài học phải từ 1 trở lên").optional(),
   isFree: z.boolean().optional(),
   isGated: z.boolean().optional(),
+  isInteractiveVideo: z.boolean().optional(),
+  subtitleUrl: z.string().nullable().optional(),
   passScore: z.number().min(0, "Điểm đạt phải từ 0 đến 100").max(100, "Điểm đạt phải từ 0 đến 100").optional().default(60),
   questions: z.array(questionSchema).optional(),
   resources: z.array(z.object({

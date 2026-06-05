@@ -13,6 +13,8 @@ const lessonSchema = z.object({
   orderIndex: z.number().min(1, "Thứ tự bài học phải từ 1 trở lên").optional(),
   isFree: z.boolean().optional(),
   isGated: z.boolean().optional(),
+  isInteractiveVideo: z.boolean().optional(),
+  subtitleUrl: z.string().nullable().optional(),
 });
 
 async function checkLessonAccess(lessonId: string) {

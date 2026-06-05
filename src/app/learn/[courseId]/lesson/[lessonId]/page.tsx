@@ -31,6 +31,8 @@ export default async function LessonPage({ params }: PageProps) {
       duration: true,
       orderIndex: true,
       isGated: true,
+      isInteractiveVideo: true,
+      subtitleUrl: true,
       session: { select: { courseId: true, title: true } },
       assignment: {
         select: {
@@ -136,6 +138,8 @@ export default async function LessonPage({ params }: PageProps) {
             videoType={lesson.videoType as "YOUTUBE" | "VIMEO" | "S3"}
             initialNotes={notes}
             initialPosition={progress?.lastPosition ?? 0}
+            isInteractiveVideo={lesson.isInteractiveVideo}
+            subtitleUrl={lesson.subtitleUrl}
           />
         </div>
       ) : lesson.type === "DOCUMENT" ? (

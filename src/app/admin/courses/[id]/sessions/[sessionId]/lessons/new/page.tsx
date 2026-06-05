@@ -41,6 +41,43 @@ export default function NewLessonPage() {
   const [duration, setDuration] = useState("0");
   const [isFree, setIsFree] = useState(false);
   const [isGated, setIsGated] = useState(false);
+  const [isInteractiveVideo, setIsInteractiveVideo] = useState(false);
+  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+  const [uploadingSubtitle, setUploadingSubtitle] = useState(false);
+  const subtitleInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSubtitleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "srt" && ext !== "vtt" && ext !== "json") {
+      alert("Chỉ chấp nhận các tập tin phụ đề định dạng .srt, .vtt hoặc .json");
+      return;
+    }
+
+    try {
+      setUploadingSubtitle(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      if (data.url) {
+        setSubtitleUrl(data.url);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Đã xảy ra lỗi khi tải tập tin phụ đề lên.");
+    } finally {
+      setUploadingSubtitle(false);
+    }
+  };
 
   // Document/Attachment Uploads
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
@@ -357,6 +394,8 @@ export default function NewLessonPage() {
         duration: duration ? parseInt(duration) : null,
         isFree,
         isGated,
+        isInteractiveVideo: type === "VIDEO" ? isInteractiveVideo : false,
+        subtitleUrl: type === "VIDEO" ? subtitleUrl : null,
         description: type === "DOCUMENT" ? description : null,
         videoUrl: type === "VIDEO" ? videoUrl : "",
         videoType: type === "VIDEO" ? videoType : "YOUTUBE",
@@ -490,6 +529,49 @@ export default function NewLessonPage() {
                         className="rounded-xl border-slate-200 bg-white"
                       />
                     </div>
+                  </div>
+                  
+                  <div className="pt-3 border-t border-slate-200/60 space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isInteractiveVideo} 
+                        onChange={(e) => setIsInteractiveVideo(e.target.checked)} 
+                        className="h-4 w-4 rounded text-blue-600 border-slate-300" 
+                      />
+                      Kích hoạt Video Tương Tác (Interactive Transcript)
+                    </label>
+
+                    {isInteractiveVideo && (
+                      <div className="space-y-2 p-3 bg-white border border-slate-200/60 rounded-xl">
+                        <Label className="text-slate-600 text-xs font-semibold">Tải lên phụ đề (.srt, .vtt, .json)</Label>
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="file" 
+                            ref={subtitleInputRef}
+                            onChange={handleSubtitleUpload}
+                            accept=".srt,.vtt,.json"
+                            className="hidden"
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => subtitleInputRef.current?.click()}
+                            disabled={uploadingSubtitle}
+                            className="rounded-xl border-slate-200"
+                          >
+                            {uploadingSubtitle ? "Đang tải lên..." : "Chọn tập tin..."}
+                          </Button>
+                          {subtitleUrl ? (
+                            <div className="text-xs text-green-600 font-semibold truncate max-w-[200px] sm:max-w-md">
+                              Đã tải lên: <a href={subtitleUrl} target="_blank" rel="noreferrer" className="underline hover:text-green-700">{subtitleUrl.split("/").pop()}</a>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium">Chưa có file phụ đề</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

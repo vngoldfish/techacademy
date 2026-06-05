@@ -28,6 +28,8 @@ interface LessonData {
   orderIndex: number;
   isFree: boolean;
   isGated: boolean;
+  isInteractiveVideo?: boolean;
+  subtitleUrl?: string | null;
 }
 
 interface AssignmentData {
@@ -72,6 +74,41 @@ export default function AdminLessonEditPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const quizFileInputRef = useRef<HTMLInputElement>(null);
+  const subtitleInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingSubtitle, setUploadingSubtitle] = useState(false);
+
+  const handleSubtitleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "srt" && ext !== "vtt" && ext !== "json") {
+      alert("Chỉ chấp nhận các tập tin phụ đề định dạng .srt, .vtt hoặc .json");
+      return;
+    }
+
+    try {
+      setUploadingSubtitle(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      if (data.url && lesson) {
+        setLesson({ ...lesson, subtitleUrl: data.url });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Đã xảy ra lỗi khi tải tập tin phụ đề lên.");
+    } finally {
+      setUploadingSubtitle(false);
+    }
+  };
 
   // Edit resource inline state
   const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
@@ -698,6 +735,49 @@ export default function AdminLessonEditPage() {
                         className="rounded-xl border-slate-200 bg-white"
                       />
                     </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-slate-200/60 space-y-4">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={lesson.isInteractiveVideo ?? false} 
+                        onChange={(e) => setLesson({ ...lesson, isInteractiveVideo: e.target.checked })} 
+                        className="h-4 w-4 rounded text-blue-600 border-slate-300" 
+                      />
+                      Kích hoạt Video Tương Tác (Interactive Transcript)
+                    </label>
+
+                    {lesson.isInteractiveVideo && (
+                      <div className="space-y-2 p-4 bg-white border border-slate-100 rounded-2xl">
+                        <Label className="text-slate-600 text-xs font-semibold">Tải lên phụ đề (.srt, .vtt, .json)</Label>
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="file" 
+                            ref={subtitleInputRef}
+                            onChange={handleSubtitleUpload}
+                            accept=".srt,.vtt,.json"
+                            className="hidden"
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => subtitleInputRef.current?.click()}
+                            disabled={uploadingSubtitle}
+                            className="rounded-xl border-slate-200"
+                          >
+                            {uploadingSubtitle ? "Đang tải lên..." : "Chọn tập tin..."}
+                          </Button>
+                          {lesson.subtitleUrl ? (
+                            <div className="text-xs text-green-600 font-semibold truncate max-w-[200px] sm:max-w-md">
+                              Đã tải lên: <a href={lesson.subtitleUrl} target="_blank" rel="noreferrer" className="underline hover:text-green-700">{lesson.subtitleUrl.split("/").pop()}</a>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium">Chưa có file phụ đề</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
