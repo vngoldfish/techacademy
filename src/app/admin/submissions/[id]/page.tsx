@@ -36,7 +36,10 @@ export default function GradeSubmissionPage() {
       body: JSON.stringify({ status, feedback }),
     });
     setLoading(false);
-    router.push("/admin/submissions");
+    
+    const params = new URLSearchParams(window.location.search);
+    const redirectUrl = params.get("redirect") || "/admin/submissions";
+    router.push(redirectUrl);
   }
 
   if (!submission) return <p className="p-6">Đang tải...</p>;

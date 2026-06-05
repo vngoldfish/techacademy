@@ -65,7 +65,7 @@ export default function SignUpPage() {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Đăng ký</CardTitle>
-        <CardDescription>Tạo tài khoản TechAcademy miễn phí</CardDescription>
+        <CardDescription>Tạo tài khoản BawuiAcademy miễn phí</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

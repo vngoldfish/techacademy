@@ -9,24 +9,46 @@ const assignmentSchema = z.object({
   isRequired: z.boolean().default(true),
 });
 
-async function requireAdmin() {
+async function checkLessonAccess(lessonId: string) {
   const session = await auth();
-  return !!session?.user && session.user.role === "ADMIN";
+  if (!session?.user || !["ADMIN", "INSTRUCTOR"].includes(session.user.role)) {
+    return { authorized: false, status: 401, error: "Unauthorized" };
+  }
+
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { session: { include: { course: true } } }
+  });
+
+  if (!lesson) {
+    return { authorized: false, status: 404, error: "Not found" };
+  }
+
+  if (session.user.role === "INSTRUCTOR" && lesson.session.course.creatorId !== session.user.id) {
+    return { authorized: false, status: 403, error: "Forbidden" };
+  }
+
+  return { authorized: true };
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ lessonId: string }> }) {
-  if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { lessonId } = await params;
-  const assignment = await prisma.assignment.findUnique({ where: { lessonId } });
+  const access = await checkLessonAccess(lessonId);
+  if (!access.authorized) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
 
+  const assignment = await prisma.assignment.findUnique({ where: { lessonId } });
   return NextResponse.json({ assignment });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ lessonId: string }> }) {
-  if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { lessonId } = await params;
+  const access = await checkLessonAccess(lessonId);
+  if (!access.authorized) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   const body = await req.json();
   const result = assignmentSchema.safeParse(body);
   if (!result.success) return NextResponse.json({ error: result.error.issues[0].message }, { status: 400 });

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import Stripe from "stripe";
 import { z } from "zod";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder");
 
 const topupSchema = z.object({
   amount: z.number().int().min(100, "Tối thiểu 100 credit").max(10000, "Tối đa 10.000 credit"),
@@ -32,8 +32,8 @@ export async function POST(req: Request) {
         price_data: {
           currency: "vnd",
           product_data: {
-            name: `${result.data.amount} credit - TechAcademy`,
-            description: `Nạp ${result.data.amount} credit vào ví TechAcademy`,
+            name: `${result.data.amount} credit - BawuiAcademy`,
+            description: `Nạp ${result.data.amount} credit vào ví BawuiAcademy`,
           },
           unit_amount: amountVnd,
         },

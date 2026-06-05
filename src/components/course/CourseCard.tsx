@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
+import { BookOpen, Coins, ArrowRight, User } from "lucide-react";
 
 interface CourseCardProps {
   course: {
@@ -14,57 +15,98 @@ interface CourseCardProps {
     priceCredit: number;
     sessionsCount?: number;
     lessonsCount?: number;
+    progress?: number;
     creator?: { name: string | null };
   };
   isEnrolled?: boolean;
+  progress?: number;
 }
 
-export function CourseCard({ course, isEnrolled }: CourseCardProps) {
+export function CourseCard({ course, isEnrolled, progress }: CourseCardProps) {
+  const courseProgress = Math.round(progress ?? course.progress ?? 0);
+  const enrolled = isEnrolled || progress !== undefined;
+
   return (
-    <Link href={`/courses/${course.slug}`}>
-      <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
-        <div className="relative aspect-video bg-gray-100">
-          {course.thumbnailUrl ? (
-            <Image
-              src={course.thumbnailUrl}
-              alt={course.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-gray-400">
-              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-          )}
-          {isEnrolled && (
-            <div className="absolute top-2 right-2">
-              <Badge className="bg-green-600">Đã đăng ký</Badge>
-            </div>
-          )}
-        </div>
-        <CardContent className="p-4">
-          <h3 className="font-semibold text-gray-900 line-clamp-2">{course.title}</h3>
-          {course.description && (
-            <p className="mt-1 text-sm text-gray-500 line-clamp-2">{course.description}</p>
-          )}
-          {course.creator && (
-            <p className="mt-2 text-xs text-gray-400">{course.creator.name}</p>
-          )}
-        </CardContent>
-        <CardFooter className="p-4 pt-0">
-          <div className="flex w-full items-center justify-between">
-            <span className="text-lg font-bold text-blue-600">
-              {formatCurrency(course.priceCredit)}
-            </span>
-            {course.lessonsCount !== undefined && (
-              <span className="text-xs text-gray-400">
-                {course.lessonsCount} bài học
-              </span>
+    <Link href={`/courses/${course.slug}`} className="group block h-full">
+      <Card className="h-full flex flex-col justify-between overflow-hidden border border-slate-100 bg-white/70 backdrop-blur-sm shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-blue-500/5 hover:border-blue-200/80 rounded-3xl group">
+        <div>
+          {/* Thumbnail Image */}
+          <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 rounded-t-3xl">
+            {course.thumbnailUrl ? (
+              <Image
+                src={course.thumbnailUrl}
+                alt={course.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center bg-gradient-to-tr from-blue-50 to-indigo-50 text-blue-400">
+                <BookOpen className="h-10 w-10 stroke-[1.2] transition-transform duration-300 group-hover:scale-110" />
+              </div>
+            )}
+            
+            {/* Status Badge */}
+            {enrolled && (
+              <div className="absolute right-4 top-4">
+                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold border-0 px-3 py-1 rounded-lg text-xs shadow-md shadow-emerald-500/10">
+                  Đang học
+                </Badge>
+              </div>
             )}
           </div>
+
+          <CardContent className="p-6">
+            <h3 className="line-clamp-2 text-base font-extrabold text-slate-900 leading-snug transition-colors group-hover:text-blue-600">
+              {course.title}
+            </h3>
+            {course.description && (
+              <p className="mt-2.5 line-clamp-2 text-sm text-slate-500 leading-relaxed">{course.description}</p>
+            )}
+            
+            <div className="mt-4 flex items-center gap-2 text-xs text-slate-400 font-medium">
+              <User className="h-3.5 w-3.5 text-slate-400" />
+              <span>Giảng viên: <strong className="text-slate-600">{course.creator?.name || "BawuiAcademy"}</strong></span>
+            </div>
+
+            {/* Learning progress bar */}
+            {enrolled && (
+              <div className="mt-5 space-y-2 border-t border-slate-100/60 pt-4">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span className="font-medium">Tiến độ học tập</span>
+                  <span className="font-bold text-emerald-600">{courseProgress}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500" 
+                    style={{ width: `${courseProgress}%` }} 
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </div>
+
+        <CardFooter className="flex items-center justify-between border-t border-slate-100/60 p-6 pt-4">
+          <div>
+            {enrolled ? (
+              <span className="inline-flex items-center gap-1 text-sm font-bold text-emerald-600 group-hover:text-emerald-700">
+                Học tiếp <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </span>
+            ) : (
+              <div className="flex items-center gap-1 text-blue-600 font-extrabold">
+                <Coins className="h-4.5 w-4.5 fill-blue-500/10 text-blue-500" />
+                <span className="text-base">{formatCurrency(course.priceCredit)}</span>
+              </div>
+            )}
+          </div>
+          
+          {course.lessonsCount !== undefined && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
+              <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+              <span>{course.lessonsCount} bài học</span>
+            </div>
+          )}
         </CardFooter>
       </Card>
     </Link>

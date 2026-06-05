@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,6 @@ export default function NewSessionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [orderIndex, setOrderIndex] = useState("1");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +25,7 @@ export default function NewSessionPage() {
       const res = await fetch(`/api/admin/courses/${courseId}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, orderIndex: parseInt(orderIndex) }),
+        body: JSON.stringify({ title }),
       });
 
       if (!res.ok) {
@@ -55,15 +53,7 @@ export default function NewSessionPage() {
               <Label htmlFor="title">Tên buổi học</Label>
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Buổi 1 - Giới thiệu React" required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Mô tả</Label>
-              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="order">Thứ tự</Label>
-              <Input id="order" type="number" value={orderIndex} onChange={(e) => setOrderIndex(e.target.value)} min="1" required />
-            </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={loading}>{loading ? "Đang tạo..." : "Tạo buổi học"}</Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>Hủy</Button>
             </div>

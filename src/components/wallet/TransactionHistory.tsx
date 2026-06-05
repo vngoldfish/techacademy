@@ -5,7 +5,7 @@ import { ArrowUpCircle, ArrowDownCircle, RotateCcw } from "lucide-react";
 interface Transaction {
   id: string;
   amount: number;
-  type: "TOPUP" | "PURCHASE" | "REFUND";
+  type: "TOPUP" | "PURCHASE" | "REFUND" | "INSTRUCTOR_FEE";
   description: string | null;
   createdAt: Date | string;
 }
@@ -14,6 +14,7 @@ const typeConfig = {
   TOPUP: { label: "Nạp credit", icon: ArrowUpCircle, color: "text-green-600", bgColor: "bg-green-50" },
   PURCHASE: { label: "Mua khóa học", icon: ArrowDownCircle, color: "text-red-600", bgColor: "bg-red-50" },
   REFUND: { label: "Hoàn credit", icon: RotateCcw, color: "text-blue-600", bgColor: "bg-blue-50" },
+  INSTRUCTOR_FEE: { label: "Ví giảng viên", icon: ArrowUpCircle, color: "text-purple-600", bgColor: "bg-purple-50" },
 };
 
 export function TransactionHistory({ transactions }: { transactions: Transaction[] }) {

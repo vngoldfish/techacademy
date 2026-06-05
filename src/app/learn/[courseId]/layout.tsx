@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { LessonSidebar } from "@/components/lesson/LessonSidebar";
+import Breadcrumbs from "@/components/common/Breadcrumbs";
+
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -61,23 +63,28 @@ export default async function LearnLayout({ children, params }: LayoutProps) {
 
   const progressByLesson = new Map(progressRecords.map((p) => [p.lessonId, p]));
   let previousIncomplete = false;
+  const sessions = [];
 
-  const sessions = course.sessions.map((s) => ({
-    ...s,
-    lessons: s.lessons.map((l) => {
+  for (const s of course.sessions) {
+    const lessons = [];
+    for (const l of s.lessons) {
       const progress = progressByLesson.get(l.id);
       const locked = l.isGated && previousIncomplete;
       const completed = progress?.completed ?? false;
       if (!completed) previousIncomplete = true;
-      return {
+      lessons.push({
         ...l,
         completed,
         inProgress: !!progress?.videoCompleted && !completed,
         locked,
         isCurrent: false,
-      };
-    }),
-  }));
+      });
+    }
+    sessions.push({
+      ...s,
+      lessons,
+    });
+  }
 
   return (
     <div className="flex h-screen">
@@ -85,8 +92,11 @@ export default async function LearnLayout({ children, params }: LayoutProps) {
         <LessonSidebar sessions={sessions} courseId={course.id} currentLessonId="" />
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-gray-50">
-        {children}
+      <main className="flex-1 overflow-y-auto bg-gray-50 flex flex-col">
+        <Breadcrumbs />
+        <div className="flex-1">
+          {children}
+        </div>
       </main>
     </div>
   );

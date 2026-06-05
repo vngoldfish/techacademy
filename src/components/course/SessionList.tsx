@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Lock, PlayCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, PlayCircle, Check, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ interface SessionData {
   id: string;
   title: string;
   orderIndex: number;
+  completedLessons?: number;
   lessons: Lesson[];
 }
 
@@ -47,73 +48,97 @@ export function SessionList({ sessions, isEnrolled, courseSlug }: SessionListPro
 
   return (
     <div className="space-y-4">
-      {sessions.map((session) => (
-        <div key={session.id} className="rounded-lg border">
-          <button
-            onClick={() => toggleSession(session.id)}
-            className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50"
+      {sessions.map((session) => {
+        const isOpen = openSessions.has(session.id);
+        
+        return (
+          <div 
+            key={session.id} 
+            className="overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-100 rounded-2xl shadow-sm transition-all duration-300 hover:border-slate-200/80"
           >
-            <div>
-              <h3 className="font-semibold text-gray-900">{session.title}</h3>
-              <p className="text-sm text-gray-500">
-                {session.lessons.length} bài học
-              </p>
-            </div>
-            {openSessions.has(session.id) ? (
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            ) : (
-              <ChevronRight className="h-5 w-5 text-gray-400" />
-            )}
-          </button>
+            <button
+              onClick={() => toggleSession(session.id)}
+              className="flex w-full items-center justify-between p-5 text-left bg-slate-50/40 hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base">{session.title}</h3>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                    {session.completedLessons !== undefined
+                      ? `${session.completedLessons}/${session.lessons.length} bài học hoàn thành`
+                      : `${session.lessons.length} bài học`}
+                  </p>
+                </div>
+              </div>
+              <div className="p-1.5 rounded-lg hover:bg-slate-100/80 transition-colors">
+                {isOpen ? (
+                  <ChevronDown className="h-5 w-5 text-slate-400" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-slate-400" />
+                )}
+              </div>
+            </button>
 
-          {openSessions.has(session.id) && (
-            <div className="border-t">
-              {session.lessons.map((lesson) => (
-                <a
-                  key={lesson.id}
-                  href={
-                    isEnrolled || lesson.isFree
-                      ? `/courses/${courseSlug}/lessons/${lesson.id}`
-                      : "#"
-                  }
-                  className={`flex items-center justify-between border-b p-4 last:border-0 ${
-                    lesson.isGated && !isEnrolled
-                      ? "cursor-not-allowed opacity-60"
-                      : "hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {lesson.completed ? (
-                      <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
-                        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    ) : lesson.isGated && !isEnrolled ? (
-                      <Lock className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <PlayCircle className="h-5 w-5 text-gray-400" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{lesson.title}</p>
-                      <div className="flex items-center gap-2">
-                        {lesson.isFree && !isEnrolled && (
-                          <Badge variant="secondary" className="text-xs">Miễn phí</Badge>
+            {isOpen && (
+              <div className="border-t border-slate-100 divide-y divide-slate-100/60 bg-white">
+                {session.lessons.map((lesson) => {
+                  const canAccess = isEnrolled || lesson.isFree;
+                  
+                  return (
+                    <a
+                      key={lesson.id}
+                      href={canAccess ? `/courses/${courseSlug}/lessons/${lesson.id}` : "#"}
+                      className={`flex items-center justify-between p-4 px-5 transition-all duration-300 ${
+                        !canAccess
+                          ? "cursor-not-allowed opacity-60 bg-slate-50/10"
+                          : "hover:bg-slate-50/60 group"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5">
+                        {/* Status Icon */}
+                        {lesson.completed ? (
+                          <div className="h-6 w-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/10 transition-transform duration-300 group-hover:scale-105">
+                            <Check className="h-3.5 w-3.5 stroke-[3]" />
+                          </div>
+                        ) : !canAccess ? (
+                          <div className="h-6 w-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200">
+                            <Lock className="h-3.5 w-3.5" />
+                          </div>
+                        ) : (
+                          <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 group-hover:bg-blue-600 group-hover:text-white">
+                            <PlayCircle className="h-4 w-4" />
+                          </div>
                         )}
-                        {lesson.duration && (
-                          <span className="text-xs text-gray-400">
-                            {formatDuration(lesson.duration)}
-                          </span>
-                        )}
+                        
+                        <div>
+                          <p className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                            {lesson.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {lesson.isFree && !isEnrolled && (
+                              <Badge className="bg-blue-50 text-blue-600 hover:bg-blue-50 border-blue-100 border text-[10px] font-bold px-1.5 py-0 rounded-md">
+                                Học thử
+                              </Badge>
+                            )}
+                            {lesson.duration && (
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                {formatDuration(lesson.duration)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

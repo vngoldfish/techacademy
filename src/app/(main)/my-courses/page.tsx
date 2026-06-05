@@ -3,8 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { CourseCard } from "@/components/course/CourseCard";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, Award, Compass, Layers } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default async function MyCoursesPage() {
   const session = await auth();
@@ -24,24 +26,54 @@ export default async function MyCoursesPage() {
           thumbnailUrl: true,
           priceCredit: true,
           creator: { select: { name: true } },
+          sessions: {
+            select: {
+              lessons: { select: { id: true } },
+            },
+          },
         },
       },
     },
     orderBy: { enrolledAt: "desc" },
   });
 
-  const inProgress = enrollments.filter((item) => item.progress < 100);
-  const completed = enrollments.filter((item) => item.progress >= 100);
+  // Calculate lessons count for each course
+  const enrollmentsWithCount = enrollments.map((item) => {
+    const lessonsCount = item.course.sessions.reduce(
+      (acc, s) => acc + s.lessons.length,
+      0
+    );
+    return {
+      ...item,
+      course: {
+        ...item.course,
+        lessonsCount,
+      },
+    };
+  });
 
-  function CourseList({ items }: { items: typeof enrollments }) {
+  const inProgress = enrollmentsWithCount.filter((item) => item.progress < 100);
+  const completed = enrollmentsWithCount.filter((item) => item.progress >= 100);
+
+  function CourseList({ items }: { items: typeof enrollmentsWithCount }) {
     if (items.length === 0) {
       return (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="mb-4 text-gray-500">Không có khóa học trong mục này.</p>
-            <a href="/courses" className="text-blue-600 hover:underline">
-              Khám phá khóa học
-            </a>
+        <Card className="border border-slate-200/60 bg-white/70 backdrop-blur-sm rounded-3xl shadow-sm max-w-lg mx-auto overflow-hidden">
+          <CardContent className="p-10 text-center space-y-4">
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
+              <BookOpen className="h-6 w-6" />
+            </div>
+            <h3 className="font-bold text-slate-900">Không có khóa học nào</h3>
+            <p className="text-sm text-slate-500 leading-relaxed max-w-sm mx-auto">
+              Mục này hiện đang trống. Hãy đăng ký thêm khóa học mới để bắt đầu tích lũy kiến thức nhé!
+            </p>
+            <div className="pt-2">
+              <Link href="/courses">
+                <Button className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 px-5 py-2.5">
+                  Khám phá khóa học ngay
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       );
@@ -51,20 +83,11 @@ export default async function MyCoursesPage() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((enrollment) => (
           <div key={enrollment.course.id}>
-            <CourseCard course={enrollment.course} isEnrolled />
-            <div className="mt-3 space-y-3">
-              <div>
-                <div className="h-2 w-full rounded-full bg-gray-200">
-                  <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: `${enrollment.progress}%` }} />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">{Math.round(enrollment.progress)}% hoàn thành</p>
-              </div>
-              <a href={`/learn/${enrollment.course.id}`}>
-                <Button className="w-full" size="sm">
-                  {enrollment.progress >= 100 ? "Xem lại" : "Tiếp tục học"}
-                </Button>
-              </a>
-            </div>
+            <CourseCard 
+              course={enrollment.course} 
+              isEnrolled={true} 
+              progress={enrollment.progress} 
+            />
           </div>
         ))}
       </div>
@@ -72,39 +95,72 @@ export default async function MyCoursesPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Khóa học của tôi</h1>
-        <p className="mt-2 text-gray-600">Theo dõi tiến độ và tiếp tục học các khóa đã mua.</p>
-      </div>
+    <div className="min-h-screen bg-slate-50/50 pb-20 pt-10">
+      <div className="container mx-auto px-4">
+        {/* Header */}
+        <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl flex items-center gap-2">
+              <Layers className="h-7 w-7 text-blue-600" />
+              Khóa học của tôi
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">Theo dõi tiến độ, tiếp tục học tập và nâng cao chuyên môn của bạn.</p>
+          </div>
+          {enrollments.length > 0 && (
+            <Link href="/courses">
+              <Button variant="outline" className="rounded-xl font-bold border-slate-200 hover:bg-slate-50">
+                <Compass className="h-4.5 w-4.5 mr-1 text-slate-500" />
+                Tìm khóa học khác
+              </Button>
+            </Link>
+          )}
+        </div>
 
-      {enrollments.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="mb-4 text-gray-500">Bạn chưa mua khóa học nào.</p>
-            <a href="/courses" className="text-blue-600 hover:underline">
-              Khám phá khóa học
-            </a>
-          </CardContent>
-        </Card>
-      ) : (
-        <Tabs defaultValue="all">
-          <TabsList className="mb-6">
-            <TabsTrigger value="all">Tất cả ({enrollments.length})</TabsTrigger>
-            <TabsTrigger value="in-progress">Đang học ({inProgress.length})</TabsTrigger>
-            <TabsTrigger value="completed">Đã hoàn thành ({completed.length})</TabsTrigger>
-          </TabsList>
-          <TabsContent value="all">
-            <CourseList items={enrollments} />
-          </TabsContent>
-          <TabsContent value="in-progress">
-            <CourseList items={inProgress} />
-          </TabsContent>
-          <TabsContent value="completed">
-            <CourseList items={completed} />
-          </TabsContent>
-        </Tabs>
-      )}
+        {enrollments.length === 0 ? (
+          <Card className="border border-slate-200/60 bg-white/70 backdrop-blur-sm rounded-3xl shadow-sm max-w-xl mx-auto overflow-hidden">
+            <CardContent className="p-12 text-center space-y-4">
+              <div className="mx-auto h-14 w-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                <Award className="h-7 w-7" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Bắt đầu hành trình học tập</h3>
+              <p className="text-sm text-slate-500 leading-relaxed max-w-sm mx-auto">
+                Bạn chưa sở hữu khóa học nào tại BawuiAcademy. Hãy đăng ký ngay khóa học đầu tiên để bắt đầu học tập.
+              </p>
+              <div className="pt-3">
+                <Link href="/courses">
+                  <Button className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 px-6 py-3">
+                    Khám phá kho khóa học
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="mb-8 p-1 bg-slate-100/80 rounded-xl w-fit flex gap-1 border border-slate-200/50">
+              <TabsTrigger value="all" className="rounded-lg font-semibold text-xs px-4 py-2">
+                Tất cả ({enrollments.length})
+              </TabsTrigger>
+              <TabsTrigger value="in-progress" className="rounded-lg font-semibold text-xs px-4 py-2">
+                Đang học ({inProgress.length})
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="rounded-lg font-semibold text-xs px-4 py-2">
+                Đã hoàn thành ({completed.length})
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="all" className="focus-visible:outline-none">
+              <CourseList items={enrollmentsWithCount} />
+            </TabsContent>
+            <TabsContent value="in-progress" className="focus-visible:outline-none">
+              <CourseList items={inProgress} />
+            </TabsContent>
+            <TabsContent value="completed" className="focus-visible:outline-none">
+              <CourseList items={completed} />
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
     </div>
   );
 }

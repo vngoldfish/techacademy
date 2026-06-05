@@ -11,7 +11,7 @@ const gradeSchema = z.object({
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user || (session.user as any).role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "INSTRUCTOR") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -25,21 +25,82 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       feedback: true,
       submittedAt: true,
       user: { select: { name: true, email: true } },
-      assignment: { select: { title: true } },
+      assignment: { 
+        select: { 
+          title: true,
+          lesson: {
+            select: {
+              session: {
+                select: {
+                  course: {
+                    select: {
+                      creatorId: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } 
+      },
     },
   });
 
   if (!submission) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ submission });
+
+  if (submission.assignment.lesson.session.course.creatorId !== session.user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  return NextResponse.json({ 
+    submission: {
+      id: submission.id,
+      content: submission.content,
+      status: submission.status,
+      feedback: submission.feedback,
+      submittedAt: submission.submittedAt,
+      user: submission.user,
+      assignment: { title: submission.assignment.title }
+    }
+  });
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user || (session.user as any).role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "INSTRUCTOR") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
+  const existingSubmission = await prisma.assignmentSubmission.findUnique({
+    where: { id },
+    select: {
+      assignment: {
+        select: {
+          lesson: {
+            select: {
+              session: {
+                select: {
+                  course: {
+                    select: {
+                      creatorId: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!existingSubmission) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (existingSubmission.assignment.lesson.session.course.creatorId !== session.user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
   const result = gradeSchema.safeParse(body);
   if (!result.success) return NextResponse.json({ error: result.error.issues[0].message }, { status: 400 });

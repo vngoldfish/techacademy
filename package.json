@@ -1,5 +1,5 @@
 {
-  "name": "techacademy",
+  "name": "bawuiacademy",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -46,6 +46,7 @@
     "typescript": "^5"
   },
   "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
+    "seed": "node --no-opt --no-turboshaft --import tsx prisma/seed.ts"
   }
+
 }

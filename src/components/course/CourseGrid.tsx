@@ -10,12 +10,14 @@ interface CourseGridProps {
     priceCredit: number;
     sessionsCount?: number;
     lessonsCount?: number;
+    progress?: number;
     creator?: { name: string | null };
   }>;
   enrolledCourseIds?: string[];
+  enrollmentProgressByCourseId?: Record<string, number>;
 }
 
-export function CourseGrid({ courses, enrolledCourseIds }: CourseGridProps) {
+export function CourseGrid({ courses, enrolledCourseIds, enrollmentProgressByCourseId }: CourseGridProps) {
   if (courses.length === 0) {
     return (
       <div className="py-12 text-center">
@@ -26,13 +28,17 @@ export function CourseGrid({ courses, enrolledCourseIds }: CourseGridProps) {
 
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {courses.map((course) => (
-        <CourseCard
-          key={course.id}
-          course={course}
-          isEnrolled={enrolledCourseIds?.includes(course.id)}
-        />
-      ))}
+      {courses.map((course) => {
+        const progress = enrollmentProgressByCourseId?.[course.id] ?? course.progress;
+        return (
+          <CourseCard
+            key={course.id}
+            course={course}
+            isEnrolled={enrolledCourseIds?.includes(course.id) || progress !== undefined}
+            progress={progress}
+          />
+        );
+      })}
     </div>
   );
 }

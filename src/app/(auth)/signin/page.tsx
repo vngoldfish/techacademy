@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -43,7 +43,7 @@ export default function SignInPage() {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Đăng nhập</CardTitle>
-        <CardDescription>Chào mừng bạn quay lại TechAcademy</CardDescription>
+        <CardDescription>Chào mừng bạn quay lại BawuiAcademy</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -103,5 +103,21 @@ export default function SignInPage() {
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <Card className="animate-pulse">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl text-transparent bg-slate-200 rounded">Đăng nhập</CardTitle>
+          <CardDescription className="text-transparent bg-slate-100 rounded mt-2">Chào mừng bạn quay lại BawuiAcademy</CardDescription>
+        </CardHeader>
+        <CardContent className="h-64" />
+      </Card>
+    }>
+      <SignInForm />
+    </Suspense>
   );
 }

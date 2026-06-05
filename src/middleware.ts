@@ -1,8 +1,13 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+export default auth((req: any) => {
   const { pathname } = req.nextUrl;
+
+  if (pathname === "/api/admin/impersonate/stop") {
+    return NextResponse.next();
+  }
+
   const session = req.auth;
 
   const protectedRoutes = ["/learn", "/profile", "/my-courses", "/quiz"];
@@ -16,7 +21,7 @@ export default auth((req) => {
 
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
   if (isAdminRoute) {
-    if (!session || (session.user as any)?.role !== "ADMIN") {
+    if (!session || (session.user?.role !== "ADMIN" && session.user?.role !== "INSTRUCTOR")) {
       return NextResponse.redirect(new URL("/", req.nextUrl.origin));
     }
   }

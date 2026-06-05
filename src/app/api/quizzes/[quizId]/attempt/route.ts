@@ -20,6 +20,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ quizId:
     where: { id: quizId },
     select: {
       passScore: true,
+      quizType: true,
+      lessonId: true,
       questions: { select: { id: true, correctAnswer: true } },
     },
   });
@@ -47,6 +49,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ quizId:
       completedAt: new Date(),
     },
   });
+
+  if (passed && quiz.lessonId) {
+    await prisma.lessonProgress.upsert({
+      where: {
+        userId_lessonId: {
+          userId: session.user.id,
+          lessonId: quiz.lessonId,
+        },
+      },
+      update: {
+        completed: true,
+        videoCompleted: true,
+        completedAt: new Date(),
+      },
+      create: {
+        userId: session.user.id,
+        lessonId: quiz.lessonId,
+        completed: true,
+        videoCompleted: true,
+        completedAt: new Date(),
+      },
+    });
+  }
 
   return NextResponse.json({ attempt: { id: attempt.id, score, passed }, results });
 }

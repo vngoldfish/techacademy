@@ -8,6 +8,7 @@ const progressSchema = z.object({
   lastPosition: z.number().min(0).optional(),
   videoCompleted: z.boolean().optional(),
   completed: z.boolean().optional(),
+  reset: z.boolean().optional(),
 });
 
 export async function GET(req: Request, { params }: { params: Promise<{ lessonId: string }> }) {
@@ -37,6 +38,54 @@ export async function POST(req: Request, { params }: { params: Promise<{ lessonI
   });
 
   if (!lesson) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (result.data.reset) {
+    const progress = await prisma.lessonProgress.upsert({
+      where: { userId_lessonId: { userId: session.user.id, lessonId } },
+      create: {
+        userId: session.user.id,
+        lessonId,
+        completed: false,
+        videoCompleted: false,
+        lastPosition: 0,
+      },
+      update: {
+        completed: false,
+        videoCompleted: false,
+        lastPosition: 0,
+        completedAt: null,
+      },
+    });
+
+    const lessonWithAssignment = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { assignment: { select: { id: true } } },
+    });
+    if (lessonWithAssignment?.assignment) {
+      await prisma.assignmentSubmission.deleteMany({
+        where: {
+          assignmentId: lessonWithAssignment.assignment.id,
+          userId: session.user.id,
+        },
+      });
+    }
+
+    const lessonWithQuiz = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { quiz: { select: { id: true } } },
+    });
+    if (lessonWithQuiz?.quiz) {
+      await prisma.quizAttempt.deleteMany({
+        where: {
+          quizId: lessonWithQuiz.quiz.id,
+          userId: session.user.id,
+        },
+      });
+    }
+
+    const courseProgress = await updateEnrollmentProgress(session.user.id, lesson.session.courseId);
+    return NextResponse.json({ progress, courseProgress });
+  }
 
   let progress = await prisma.lessonProgress.upsert({
     where: { userId_lessonId: { userId: session.user.id, lessonId } },
